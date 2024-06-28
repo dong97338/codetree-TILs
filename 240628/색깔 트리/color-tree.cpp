@@ -1,81 +1,63 @@
 #include <iostream>
 #include <vector>
-#include <algorithm>
-#define MAX_ID 100005
-#define COLOR_MAX 5
 using namespace std;
 
-struct Node {
-    int id, color, lastUpdate, maxDepth, parentId;
-    vector<int> childIds;
-};
+#define MAX_ID 100005
+#define COLOR_MAX 5
 
-class ColorCount {
-public:
-    int cnt[COLOR_MAX+1] = {0};
-    ColorCount operator+(ColorCount const& obj) {
-        ColorCount res;
-        for (int i=1; i<=COLOR_MAX; i++) res.cnt[i] = cnt[i] + obj.cnt[i];
-        return res;
-    }
-    int score() {
-        int result = 0;
-        for (int i=1; i<=COLOR_MAX; i++) result += cnt[i] ? 1 : 0;
-        return result * result;
-    }
-};
+int id[MAX_ID], color[MAX_ID], lastUpdate[MAX_ID], maxDepth[MAX_ID], parentId[MAX_ID], isRoot[MAX_ID];
+vector<int> childIds[MAX_ID];
+int cnt[COLOR_MAX+1];
 
-Node nodes[MAX_ID];
-bool isRoot[MAX_ID];
-
-bool canMakeChild(Node curr, int needDepth) {
-    return curr.id == 0 || (curr.maxDepth > needDepth && canMakeChild(nodes[curr.parentId], needDepth+1));
+bool canMakeChild(int curr, int needDepth) {
+    return curr == 0 || (maxDepth[curr] > needDepth && canMakeChild(parentId[curr], needDepth+1));
 }
 
-pair<int, int> getColor(Node curr) {
-    if (curr.id == 0) return {0, 0};
-    auto info = getColor(nodes[curr.parentId]);
-    return info.second > curr.lastUpdate ? info : make_pair(curr.color, curr.lastUpdate);
+pair<int, int> getColor(int curr) {
+    if (curr == 0) return {0, 0};
+    auto info = getColor(parentId[curr]);
+    return info.second > lastUpdate[curr] ? info : make_pair(color[curr], lastUpdate[curr]);
 }
 
-pair<int, ColorCount> getBeauty(Node curr, int color, int lastUpdate) {
-    if (lastUpdate < curr.lastUpdate) { lastUpdate = curr.lastUpdate; color = curr.color; }
-    pair<int, ColorCount> result; result.second.cnt[color] = 1;
-    for (int childId : curr.childIds) {
-        auto subResult = getBeauty(nodes[childId], color, lastUpdate);
-        result.second = result.second + subResult.second; result.first += subResult.first;
+pair<int, int*> getBeauty(int curr, int col, int lastUpd) {
+    if (lastUpd < lastUpdate[curr]) { lastUpd = lastUpdate[curr]; col = color[curr]; }
+    int* cnt = new int[COLOR_MAX+1]();
+    cnt[col] = 1;
+    int score = 0;
+    for (int child : childIds[curr]) {
+        auto subResult = getBeauty(child, col, lastUpd);
+        for (int i=1; i<=COLOR_MAX; i++) cnt[i] += subResult.second[i];
+        score += subResult.first;
+        delete[] subResult.second;
     }
-    result.first += result.second.score();
-    return result;
+    int uniqueColors = 0;
+    for (int i=1; i<=COLOR_MAX; i++) uniqueColors += cnt[i] ? 1 : 0;
+    score += uniqueColors * uniqueColors;
+    return {score, cnt};
 }
 
 int main() {
-    int Q, T, mId, pId, color, maxDepth;
+    int Q, T, mId, pId, col, maxDep;
     cin >> Q;
     for (int i=1; i<=Q; i++) {
         cin >> T;
-        switch (T) {
-            case 100:
-                cin >> mId >> pId >> color >> maxDepth;
-                if (pId == -1) isRoot[mId] = true;
-                if (isRoot[mId] || canMakeChild(nodes[pId], 1)) {
-                    nodes[mId] = {mId, color, i, maxDepth, isRoot[mId] ? 0 : pId};
-                    if (!isRoot[mId]) nodes[pId].childIds.push_back(mId);
-                }
-                break;
-            case 200:
-                cin >> mId >> color;
-                nodes[mId].color = color; nodes[mId].lastUpdate = i;
-                break;
-            case 300:
-                cin >> mId;
-                cout << getColor(nodes[mId]).first << endl;
-                break;
-            case 400:
-                int beauty = 0;
-                for (int i=1; i<MAX_ID; i++) if (isRoot[i]) beauty += getBeauty(nodes[i], nodes[i].color, nodes[i].lastUpdate).first;
-                cout << beauty << endl;
-                break;
+        if (T == 100) {
+            cin >> mId >> pId >> col >> maxDep;
+            if (pId == -1) isRoot[mId] = 1;
+            if (isRoot[mId] || canMakeChild(pId, 1)) {
+                id[mId] = mId; color[mId] = col; lastUpdate[mId] = i; maxDepth[mId] = maxDep; parentId[mId] = isRoot[mId] ? 0 : pId;
+                if (!isRoot[mId]) childIds[pId].push_back(mId);
+            }
+        } else if (T == 200) {
+            cin >> mId >> col;
+            color[mId] = col; lastUpdate[mId] = i;
+        } else if (T == 300) {
+            cin >> mId;
+            cout << getColor(mId).first << endl;
+        } else if (T == 400) {
+            int beauty = 0;
+            for (int i=1; i<MAX_ID; i++) if (isRoot[i]) beauty += getBeauty(i, color[i], lastUpdate[i]).first;
+            cout << beauty << endl;
         }
     }
     return 0;
